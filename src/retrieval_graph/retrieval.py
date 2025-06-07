@@ -79,6 +79,8 @@ def make_chroma_retriever(
 ) -> Generator[VectorStoreRetriever, None, None]:
     """Configure this agent to connect to a ChromaDB instance."""
     from langchain_chroma import Chroma
+    from langchain_core.documents import Document
+    from langchain_core.callbacks import CallbackManagerForRetrieverRun
     import chromadb
 
     # Create ChromaDB client - can be persistent or in-memory
@@ -102,12 +104,37 @@ def make_chroma_retriever(
         embedding_function=embedding_model,
     )
 
-    search_kwargs = configuration.search_kwargs
-    # ChromaDB uses 'where' for metadata filtering
-    search_filter = search_kwargs.setdefault("where", {})
-    search_filter["user_id"] = {"$eq": configuration.user_id}
+    # Create a custom retriever class to handle the where filter properly
+    class ChromaRetrieverWrapper(VectorStoreRetriever):
+        def __init__(self, vectorstore, user_id: str, search_kwargs: dict):
+            # Don't pass where filter in search_kwargs to avoid conflicts
+            clean_search_kwargs = {k: v for k, v in search_kwargs.items() if k != "where"}
+            super().__init__(vectorstore=vectorstore, search_kwargs=clean_search_kwargs)
+            # Store user_id and original_where as instance attributes
+            self._user_id = user_id
+            self._original_where = search_kwargs.get("where", {})
 
-    yield vstore.as_retriever(search_kwargs=search_kwargs)
+        def _get_relevant_documents(
+            self, query: str, *, run_manager: CallbackManagerForRetrieverRun
+        ) -> list[Document]:
+            # Build the where filter with user_id
+            where_filter = self._original_where.copy()
+            where_filter["user_id"] = {"$eq": self._user_id}
+
+            # Use similarity_search directly with proper where filter
+            return self.vectorstore.similarity_search(
+                query=query,
+                k=self.search_kwargs.get("k", 4),
+                where=where_filter
+            )
+
+    retriever = ChromaRetrieverWrapper(
+        vectorstore=vstore,
+        user_id=configuration.user_id,
+        search_kwargs=configuration.search_kwargs
+    )
+
+    yield retriever
 
 
 @contextmanager
