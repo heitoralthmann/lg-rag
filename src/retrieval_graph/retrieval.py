@@ -1,7 +1,7 @@
 """Manage the configuration of various retrievers.
 
 This module provides functionality to create and manage retrievers for different
-vector store backends, specifically Elasticsearch, Pinecone, and MongoDB.
+vector store backends, specifically Elasticsearch, Pinecone, MongoDB, and ChromaDB.
 
 The retrievers support filtering results by user_id to ensure data isolation between users.
 """
@@ -105,6 +105,43 @@ def make_mongodb_retriever(
 
 
 @contextmanager
+def make_chroma_retriever(
+    configuration: IndexConfiguration, embedding_model: Embeddings
+) -> Generator[VectorStoreRetriever, None, None]:
+    """Configure this agent to connect to a ChromaDB instance."""
+    from langchain_chroma import Chroma
+    import chromadb
+
+    # Create ChromaDB client - can be persistent or in-memory
+    # Check if CHROMA_PERSIST_DIRECTORY is set for persistent storage
+    persist_directory = os.environ.get("CHROMA_PERSIST_DIRECTORY")
+
+    if persist_directory:
+        # Persistent ChromaDB client
+        chroma_client = chromadb.PersistentClient(path=persist_directory)
+    else:
+        # In-memory ChromaDB client
+        chroma_client = chromadb.Client()
+
+    # Collection name can be configured via environment variable
+    collection_name = os.environ.get("CHROMA_COLLECTION_NAME", "langchain_collection")
+
+    # Initialize Chroma vector store
+    vstore = Chroma(
+        client=chroma_client,
+        collection_name=collection_name,
+        embedding_function=embedding_model,
+    )
+
+    search_kwargs = configuration.search_kwargs
+    # ChromaDB uses 'where' for metadata filtering
+    search_filter = search_kwargs.setdefault("where", {})
+    search_filter["user_id"] = {"$eq": configuration.user_id}
+
+    yield vstore.as_retriever(search_kwargs=search_kwargs)
+
+
+@contextmanager
 def make_retriever(
     config: RunnableConfig,
 ) -> Generator[VectorStoreRetriever, None, None]:
@@ -125,6 +162,10 @@ def make_retriever(
 
         case "mongodb":
             with make_mongodb_retriever(configuration, embedding_model) as retriever:
+                yield retriever
+
+        case "chroma":
+            with make_chroma_retriever(configuration, embedding_model) as retriever:
                 yield retriever
 
         case _:
