@@ -35,7 +35,7 @@ class IndexConfiguration:
         Literal["pinecone", "mongodb", "chroma"],
         {"__template_metadata__": {"kind": "retriever"}},
     ] = field(
-        default="mongodb",
+        default="chroma",
         metadata={
             "description": "The vector store provider to use for retrieval. Options are 'pinecone', 'mongodb', or 'chroma'."
         },

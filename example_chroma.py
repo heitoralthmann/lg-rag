@@ -29,8 +29,8 @@ async def main():
             "user_id": "example_user",
             "retriever_provider": "chroma",
             "embedding_model": "openai/text-embedding-3-small",
-            "response_model": "openai/gpt-3.5-turbo",
-            "query_model": "openai/gpt-3.5-turbo"
+            "response_model": "openai/gpt-4o-mini",
+            "query_model": "openai/gpt-4o-mini"
         }
     }
 
