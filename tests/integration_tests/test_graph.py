@@ -15,7 +15,7 @@ async def test_retrieval_graph() -> None:
     other_user_id = "test__" + uuid.uuid4().hex
 
     config = RunnableConfig(
-        configurable={"user_id": user_id, "retriever_provider": "elastic-local"}
+        configurable={"user_id": user_id, "retriever_provider": "mongodb"}
     )
 
     result = await index_graph.ainvoke({"docs": simple_doc}, config)
@@ -33,7 +33,7 @@ async def test_retrieval_graph() -> None:
         {
             "configurable": {
                 "user_id": other_user_id,
-                "retriever_provider": "elastic-local",
+                "retriever_provider": "mongodb",
             }
         },
     )

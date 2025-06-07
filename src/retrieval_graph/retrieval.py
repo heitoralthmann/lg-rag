@@ -1,7 +1,7 @@
 """Manage the configuration of various retrievers.
 
 This module provides functionality to create and manage retrievers for different
-vector store backends, specifically Elasticsearch, Pinecone, MongoDB, and ChromaDB.
+vector store backends, specifically Pinecone, MongoDB, and ChromaDB.
 
 The retrievers support filtering results by user_id to ensure data isolation between users.
 """
@@ -36,37 +36,6 @@ def make_text_encoder(model: str) -> Embeddings:
 
 
 ## Retriever constructors
-
-
-@contextmanager
-def make_elastic_retriever(
-    configuration: IndexConfiguration, embedding_model: Embeddings
-) -> Generator[VectorStoreRetriever, None, None]:
-    """Configure this agent to connect to a specific elastic index."""
-    from langchain_elasticsearch import ElasticsearchStore
-
-    connection_options = {}
-    if configuration.retriever_provider == "elastic-local":
-        connection_options = {
-            "es_user": os.environ["ELASTICSEARCH_USER"],
-            "es_password": os.environ["ELASTICSEARCH_PASSWORD"],
-        }
-
-    else:
-        connection_options = {"es_api_key": os.environ["ELASTICSEARCH_API_KEY"]}
-
-    vstore = ElasticsearchStore(
-        **connection_options,  # type: ignore
-        es_url=os.environ["ELASTICSEARCH_URL"],
-        index_name="langchain_index",
-        embedding=embedding_model,
-    )
-
-    search_kwargs = configuration.search_kwargs
-
-    search_filter = search_kwargs.setdefault("filter", [])
-    search_filter.append({"term": {"metadata.user_id": configuration.user_id}})
-    yield vstore.as_retriever(search_kwargs=search_kwargs)
 
 
 @contextmanager
@@ -152,10 +121,6 @@ def make_retriever(
     if not user_id:
         raise ValueError("Please provide a valid user_id in the configuration.")
     match configuration.retriever_provider:
-        case "elastic" | "elastic-local":
-            with make_elastic_retriever(configuration, embedding_model) as retriever:
-                yield retriever
-
         case "pinecone":
             with make_pinecone_retriever(configuration, embedding_model) as retriever:
                 yield retriever
